@@ -1,0 +1,13 @@
+# Streamlit
+.streamlit/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter/Notebook cache
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
