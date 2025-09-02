@@ -658,7 +658,9 @@ with tab1:
         f["UR Equivalent (Primary)"] = f["UR Equivalent (Primary)"].apply(_clean_ureq)
 
     # --- Robust dedupe for student view ---
-    f["__prog_norm"]  = f.get("Partner University", "").astype(str).apply(lambda s: _norm_text(clean_display_text(s)))
+    # f["__prog_norm"]  = f.get("Partner University", "").astype(str).apply(lambda s: _norm_text(clean_display_text(s)))
+    partner_series = f["Partner University"] if "Partner University" in f.columns else pd.Series([""] * len(f), index=f.index)
+    f["__prog_norm"] = partner_series.astype(str).apply(lambda s: _norm_text(clean_display_text(s)))
     code_col = "Course Code (Display)" if "Course Code (Display)" in f.columns else (
                "Course Code" if "Course Code" in f.columns else None)
     if code_col:
