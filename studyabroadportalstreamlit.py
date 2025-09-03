@@ -561,8 +561,8 @@ st.markdown(
 with st.expander("More details"):
     st.markdown(
         "- **Data Sources:** Official course approvals and student submissions maintained by the Center for Education Abroad.\n"
-        "- **Approval Definition:** A course is marked *approved* if it has either been assigned a UR equivalent or "
-        "granted elective/major–minor credit by the relevant academic department.\n"
+        "- **Approval Definition:** A course is marked *approved* if it has either been granted an elective or "
+        "a major–minor credit by the relevant academic department.\n"
         "- **Note:** This resource is intended for reference only. Final approval decisions rest with the appropriate academic department."
     )
 st.divider()
