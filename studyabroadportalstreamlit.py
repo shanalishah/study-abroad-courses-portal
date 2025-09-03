@@ -8,33 +8,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# ---- DEBUG: show which data files are found in the working dir ----
-if st.sidebar.toggle("Show data file diagnostics", value=True):
-    import os, pandas as pd
-    st.sidebar.write("**Working directory**:", os.getcwd())
-
-    def _exists(p):
-        return "✅" if os.path.exists(p) else "❌"
-
-    files = [
-        ("Equivalency_Map.xlsx", ["Map_Primary", "Map_Alternates"]),
-        ("Student_Approvals_With_Demographics.xlsx", None),
-        ("outgoing_students_CLEAN4.xlsx", ["Outgoing_CLEAN4"]),
-        ("outgoing_students.xlsx", None),
-        ("DEPT_MAP.json", None),
-        ("finance_agg.csv", None),
-    ]
-    for fname, sheets in files:
-        st.sidebar.write(f"- **{fname}**: {_exists(fname)}")
-        if os.path.exists(fname) and fname.lower().endswith(".xlsx") and sheets:
-            try:
-                x = pd.ExcelFile(fname)
-                st.sidebar.caption("  Sheets: " + ", ".join(x.sheet_names))
-                for s in sheets:
-                    st.sidebar.write(f"  └─ needs `{s}`: {'✅' if s in x.sheet_names else '❌'}")
-            except Exception as e:
-                st.sidebar.write(f"  (excel open error: {e})")
-
 # ------------ Altair (optional) ------------
 ALT_OK = True
 try:
@@ -595,7 +568,6 @@ with st.expander("More details"):
 st.divider()
 
 tab1, tab2, tab3, tab4 = st.tabs(["Student View", "CEA Internal View", "Analysis", "Advising Tool"])
-
 # =========================================================
 # Tab 1 — Student View
 # =========================================================
@@ -773,7 +745,6 @@ with tab1:
         mime="text/csv",
         key="t1_dl"
     )
-
 # =========================================================
 # Tab 2 — Course Approval Database - Internal
 # =========================================================
@@ -1019,8 +990,6 @@ with tab2:
         mime="text/csv",
         key="t2_dl"
     )
-
-
 # =========================================================
 # Tab 3 — Analysis (Long-horizon dataset)
 # =========================================================
@@ -1171,7 +1140,6 @@ with tab3:
         "Student View", "Advisor View (CEA Team)", "Academic Departments",
         "Marketing", "Leadership / Finance"
     ])
-
     # --------------------------
     # Student View (Analysis)
     # --------------------------
@@ -1512,7 +1480,6 @@ with tab3:
                     .rename(columns={"City_short": "City"}),
                     "City", "Row Count", "Top Cities"
                 )
-
     # --------------------------
     # Academic Departments
     # --------------------------
@@ -1955,7 +1922,6 @@ with tab3:
             mime="text/csv",
             key="lead_dl"
         )
-    
     
 # =========================================================
 # Tab 4 — Advising Tool (rule-based)
