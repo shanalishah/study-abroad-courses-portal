@@ -8,6 +8,33 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+# ---- DEBUG: show which data files are found in the working dir ----
+if st.sidebar.toggle("Show data file diagnostics", value=True):
+    import os, pandas as pd
+    st.sidebar.write("**Working directory**:", os.getcwd())
+
+    def _exists(p):
+        return "✅" if os.path.exists(p) else "❌"
+
+    files = [
+        ("Equivalency_Map.xlsx", ["Map_Primary", "Map_Alternates"]),
+        ("Student_Approvals_With_Demographics.xlsx", None),
+        ("outgoing_students_CLEAN4.xlsx", ["Outgoing_CLEAN4"]),
+        ("outgoing_students.xlsx", None),
+        ("DEPT_MAP.json", None),
+        ("finance_agg.csv", None),
+    ]
+    for fname, sheets in files:
+        st.sidebar.write(f"- **{fname}**: {_exists(fname)}")
+        if os.path.exists(fname) and fname.lower().endswith(".xlsx") and sheets:
+            try:
+                x = pd.ExcelFile(fname)
+                st.sidebar.caption("  Sheets: " + ", ".join(x.sheet_names))
+                for s in sheets:
+                    st.sidebar.write(f"  └─ needs `{s}`: {'✅' if s in x.sheet_names else '❌'}")
+            except Exception as e:
+                st.sidebar.write(f"  (excel open error: {e})")
+
 # ------------ Altair (optional) ------------
 ALT_OK = True
 try:
