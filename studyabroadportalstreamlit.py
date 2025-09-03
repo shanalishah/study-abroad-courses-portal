@@ -188,7 +188,20 @@ def clean_display_text(s: str) -> str:
     t = re.sub(r"\s*[—-]\s*", " — ", t)
     t = re.sub(r"\s+", " ", t).strip()
     return t
-
+    
+def ensure_column(df: pd.DataFrame, dest: str, source_candidates: list[str]) -> None:
+    """
+    Create df[dest] from the first available source column; if none exist,
+    create an empty string column so downstream code won't KeyError.
+    """
+    if dest in df.columns:
+        return
+    for s in source_candidates:
+        if s in df.columns:
+            df[dest] = df[s]
+            return
+    df[dest] = pd.Series([""] * len(df), index=df.index)
+    
 # ---------------- Program name canonicalization + dedupe (global) ----------------
 _GENERIC_TITLES_RAW = {
     "arts & culture","language & culture","language & area studies","irish studies",
@@ -220,9 +233,15 @@ def _split_prog_base(prog_str: str) -> tuple[str, str]:
         return provider, base
     return "", s
 
+# def canonicalize_program_and_dedupe(df: pd.DataFrame) -> pd.DataFrame:
+#     if df is None or df.empty:
+#         return df
+
 def canonicalize_program_and_dedupe(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
-        return df
+        # Return a schema with expected columns (prevents KeyErrors downstream)
+        return pd.DataFrame(columns=["Partner University", "Program/University"])
+        
     d = df.copy()
 
     if "Partner University" not in d.columns:
@@ -734,10 +753,25 @@ with tab1:
 with tab2:
     st.subheader("Course Approval Database - Internal")
 
+    # base = prim.copy()
+    # base = canonicalize_program_and_dedupe(base)
+    # if "Program/University" not in base.columns:
+    #     base["Program/University"] = base["Partner University"]
     base = prim.copy()
+
+    # If nothing loaded, stop cleanly with a helpful message
+    if base.empty:
+        st.error(
+            "No mapping rows loaded. Make sure **Equivalency_Map.xlsx** exists in the app folder "
+            "and the sheet name **'Map_Primary'** is correct."
+        )
+        st.stop()
+
     base = canonicalize_program_and_dedupe(base)
-    if "Program/University" not in base.columns:
-        base["Program/University"] = base["Partner University"]
+
+    # Safely ensure the columns exist without KeyErrors
+    ensure_column(base, "Partner University", ["Program/University", "Program", "Host Institution", "Institution"])
+    ensure_column(base, "Program/University", ["Partner University", "Program", "Program Name"])
 
     recent = recent_student.copy()
     if not recent.empty:
@@ -1902,11 +1936,17 @@ with tab3:
 with tab4:
     st.subheader("Advising Assistant")
 
+    # df = approved.copy()
+    # df = canonicalize_program_and_dedupe(df)
+    # df = drop_unbranded_generic_program_rows(df)
+    # if "Program/University" not in df.columns:
+    #     df["Program/University"] = df["Partner University"]
     df = approved.copy()
     df = canonicalize_program_and_dedupe(df)
     df = drop_unbranded_generic_program_rows(df)
-    if "Program/University" not in df.columns:
-        df["Program/University"] = df["Partner University"]
+    
+    ensure_column(df, "Partner University", ["Program/University", "Program", "Host Institution", "Institution"])
+    ensure_column(df, "Program/University", ["Partner University", "Program", "Program Name"])
     
     c1, c2, c3 = st.columns(3)
     intended_major = c1.text_input("Intended Major / Subject (e.g., ECON, PSCI, PSY)", key="t4_major")
