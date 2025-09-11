@@ -1,1 +1,1 @@
-# study-abroad-courses-portal
+# CEA Study-Abroad-Courses-Portal
