@@ -50,10 +50,41 @@ def y_categorical(field: str, values: list[str] | None = None, title: str | None
 st.set_page_config(page_title="CEA Advising Portal", layout="wide")
 
 # ------------ File locations ------------
-MAP_XLSX = "Equivalency_Map.xlsx"                          # from builder
+# MAP_XLSX = "Equivalency_Map.xlsx"                          # from builder
+# MAP_PRIMARY_SHEET = "Map_Primary"
+# MAP_ALTS_SHEET    = "Map_Alternates"
+# STUDENTS_XLSX = "Student_Approvals_With_Demographics.xlsx" # merged student records
+
+# ---------------------------------------------------------
+# CORRECT FILE PATHS FOR STREAMLIT (PLACE THIS AFTER IMPORTS)
+# ---------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+
+# Primary equivalency map
+MAP_XLSX = DATA_DIR / "Equivalency_Map.xlsx"
 MAP_PRIMARY_SHEET = "Map_Primary"
 MAP_ALTS_SHEET    = "Map_Alternates"
-STUDENTS_XLSX = "Student_Approvals_With_Demographics.xlsx" # merged student records
+
+# Students approvals sheet
+STUDENTS_XLSX = DATA_DIR / "Student_Approvals_With_Demographics.xlsx"
+
+# Outgoing students files
+OUTGOING_CLEAN = DATA_DIR / "outgoing_students_CLEAN4.xlsx"
+OUTGOING_RAW   = DATA_DIR / "outgoing_students.xlsx"
+
+# Finance aggregated CSV
+FINANCE_CSV = DATA_DIR / "finance_agg.csv"
+
+# Department JSON mapping
+DEPT_JSON = DATA_DIR / "DEPT_MAP.json"
+
+# Load DEPT_MAP safely
+try:
+    with open(DEPT_JSON, "r", encoding="utf-8") as _f:
+        DEPT_MAP: dict[str, str] = json.load(_f)
+except Exception:
+    DEPT_MAP = {}
 
 # ---- Subject whitelist (curated) ----
 import json
@@ -91,12 +122,24 @@ def soft_unique(series):
         return []
     return sorted([v for v in series.dropna().unique().tolist() if str(v).strip()])
 
+# def safe_read_xlsx(path, sheet=None):
+#     if not Path(path).exists():
+#         return pd.DataFrame()
+#     try:
+#         return pd.read_excel(path, sheet_name=sheet) if sheet else pd.read_excel(path)
+#     except Exception:
+#         return pd.DataFrame()
+
 def safe_read_xlsx(path, sheet=None):
-    if not Path(path).exists():
+    path = Path(path)
+    if not path.exists():
+        st.warning(f"File not found: {path}")
         return pd.DataFrame()
+
     try:
         return pd.read_excel(path, sheet_name=sheet) if sheet else pd.read_excel(path)
-    except Exception:
+    except Exception as e:
+        st.warning(f"Error reading {path}: {e}")
         return pd.DataFrame()
 
 def _clean_opts(series):
@@ -322,6 +365,8 @@ def drop_unbranded_generic_program_rows(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------- Load mapping/students (cached) ----------------
 @st.cache_data(show_spinner=False)
 def load_mapping():
+    # prim = safe_read_xlsx(MAP_XLSX, MAP_PRIMARY_SHEET)
+    # alts = safe_read_xlsx(MAP_XLSX, MAP_ALTS_SHEET)
     prim = safe_read_xlsx(MAP_XLSX, MAP_PRIMARY_SHEET)
     alts = safe_read_xlsx(MAP_XLSX, MAP_ALTS_SHEET)
 
@@ -354,7 +399,8 @@ def load_mapping():
 
 @st.cache_data(show_spinner=False)
 def load_students():
-    df = safe_read_xlsx(STUDENTS_XLSX)  # first sheet
+    # df = safe_read_xlsx(STUDENTS_XLSX)  # first sheet
+    df = safe_read_xlsx(STUDENTS_XLSX)
     if df.empty:
         return df, pd.DataFrame()
 
@@ -447,7 +493,7 @@ def load_outgoing_students():
         except Exception:
             df = pd.read_excel(cleaned_path)  # fall back: first sheet
     elif os.path.exists(raw_path):
-        df = pd.read_excel(raw_path, sheet_name=None)
+        df = (raw_path, sheet_name=None)
         # pick a likely sheet (same heuristic you had)
         if isinstance(df, dict):
             picked = None
@@ -1795,7 +1841,8 @@ with tab3:
         st.subheader("Leadership / Finance")
     
         @st.cache_data(show_spinner=False)
-        def load_finance_agg(path_csv="finance_agg.csv"):
+        # def load_finance_agg(path_csv="finance_agg.csv"):
+        def load_finance_agg(path_csv=FINANCE_CSV):
             import pandas as pd, numpy as np
             try:
                 agg = pd.read_csv(path_csv, dtype=object)
