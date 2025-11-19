@@ -493,7 +493,8 @@ def load_outgoing_students():
         except Exception:
             df = pd.read_excel(cleaned_path)  # fall back: first sheet
     elif os.path.exists(raw_path):
-        df = (raw_path, sheet_name=None)
+        # df = (raw_path, sheet_name=None)
+        df = pd.read_excel(raw_path, sheet_name=None)
         # pick a likely sheet (same heuristic you had)
         if isinstance(df, dict):
             picked = None
