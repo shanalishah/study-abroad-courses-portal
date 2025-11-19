@@ -485,9 +485,129 @@ def load_outgoing_students():
     """
     import pandas as pd, numpy as np, os, re
 
-    cleaned_path = "outgoing_students_CLEAN4.xlsx"
-    raw_path = "outgoing_students.xlsx"
+    # cleaned_path = "outgoing_students_CLEAN4.xlsx"
+    # raw_path = "outgoing_students.xlsx"
+@st.cache_data(show_spinner=False)
+def load_outgoing_students():
+    """
+    Load outgoing students with a strong preference for the cleaned file produced by the notebook.
+    Falls back to raw outgoing_students.xlsx if CLEAN4 isn't present.
+    Normalizes key columns and preserves your existing behavior.
+    """
+    import pandas as pd, numpy as np, re
+    from pathlib import Path
 
+    cleaned_path = OUTGOING_CLEAN   # data/outgoing_students_CLEAN4.xlsx
+    raw_path = OUTGOING_RAW         # data/outgoing_students.xlsx
+
+    if cleaned_path.exists():
+        try:
+            df = pd.read_excel(cleaned_path, sheet_name="Outgoing_CLEAN4")
+        except Exception:
+            df = pd.read_excel(cleaned_path)  # fall back: first sheet
+    elif raw_path.exists():
+        df = pd.read_excel(raw_path, sheet_name=None)
+        # pick a likely sheet (same heuristic you had)
+        if isinstance(df, dict):
+            picked = None
+            for name, d in df.items():
+                cols_lower = " ".join([str(c).lower() for c in d.columns])
+                if ("program" in cols_lower or "partner" in cols_lower) and "course" in cols_lower:
+                    picked = d; break
+            if picked is None:
+                picked = list(df.values())[0]
+            df = picked
+    else:
+        # No outgoing files found -> return empty frame
+        return pd.DataFrame()
+
+    if df.empty:
+        return df
+
+    # --- Normalize key columns used downstream ---
+    rename_map = {
+        "Program": "Partner University",
+        "Program/University": "Partner University",
+        "Program_Name": "Partner University",
+        "UR Course Equivalent": "UR Equivalent (Primary)",
+        "UR Equivalent": "UR Equivalent (Primary)",
+        "Course Code (Display)": "Course Code (Display)",
+        "Course Code": "Course Code",
+        "Course Title (Display)": "Course Title (Display)",
+        "Course Title": "Course Title",
+        "Term": "Term (Primary)",
+        "Year": "Year (Primary)",
+    }
+    have = set(df.columns)
+    apply_map = {k: v for k, v in rename_map.items() if k in have and v not in have}
+    if apply_map:
+        df = df.rename(columns=apply_map)
+
+    if "Partner University" not in df.columns and "Program/University" in df.columns:
+        df["Partner University"] = df["Program/University"]
+    if "Program/University" not in df.columns and "Partner University" in df.columns:
+        df["Program/University"] = df["Partner University"]
+
+    # Clean display fields
+    for col in ["Partner University", "Program/University", "Course Title", "Course Title (Display)"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
+
+    # Ensure UR Dept is curated (whitelist) and add display name
+    if "UR Dept" in df.columns:
+        df["UR Dept"] = (
+            df["UR Dept"].astype("string").str.strip().str.upper()
+            .where(df["UR Dept"].astype("string").str.strip().str.upper().isin(SEED_CODES))
+        )
+    else:
+        df["UR Dept"] = pd.Series([pd.NA]*len(df), dtype="string")
+
+    # Try to derive only from trusted places if still missing
+    need = df["UR Dept"].isna()
+    for col in ["UR Equivalent (Primary)", "UR Equivalent", "UR Course Equivalent",
+                "Course Code (Display)", "Course Code"]:
+        if need.any() and col in df.columns:
+            df.loc[need, "UR Dept"] = df.loc[need, col].apply(_derive_code_from_text)
+            need = df["UR Dept"].isna()
+
+    df["UR Dept"] = df["UR Dept"].where(df["UR Dept"].isin(SEED_CODES))
+    df["UR Dept Name"] = df["UR Dept"].map(DEPT_MAP).astype("string")
+
+    # Split itinerary into City/Country (if needed)
+    if "Itinerary_Locations" in df.columns:
+        def _split_loc(cell):
+            parts = re.split(r"[;|]+", str(cell or ""))
+            parts = [p.strip() for p in parts if p.strip()]
+            cities, countries = [], []
+            for p in parts:
+                if "," in p:
+                    left, right = p.rsplit(",", 1)
+                    cities.append(left.strip())
+                    countries.append(right.strip())
+                else:
+                    countries.append(p.strip())
+
+            def _uniq(seq):
+                seen = set(); out = []
+                for x in seq:
+                    if x and x.lower() not in {"nan","none"} and x not in seen:
+                        seen.add(x); out.append(x)
+                return out
+
+            return "; ".join(_uniq(cities)) or np.nan, "; ".join(_uniq(countries)) or np.nan
+
+        tmp = df["Itinerary_Locations"].apply(_split_loc).apply(pd.Series)
+        tmp.columns = ["__CityList", "__CountryList"]
+        df["City"] = df.get("City", tmp["__CityList"]).fillna(tmp["__CityList"])
+        df["Country"] = df.get("Country", tmp["__CountryList"]).fillna(tmp["__CountryList"])
+        df.drop(columns=["__CityList","__CountryList"], errors="ignore", inplace=True)
+
+    if "Year (Primary)" in df.columns:
+        df["Year (Primary)"] = pd.to_numeric(df["Year (Primary)"], errors="coerce")
+
+    return df
+
+    
     if os.path.exists(cleaned_path):
         try:
             df = pd.read_excel(cleaned_path, sheet_name="Outgoing_CLEAN4")
